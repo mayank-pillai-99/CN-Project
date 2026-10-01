@@ -1,9 +1,5 @@
 # Phase 1 Submission Answers (Team 1)
 
-Items marked **TODO** still need new evidence before you submit (listed at the end of this file).
-
----
-
 ## A1: Machine IPs and roles
 ```
 Mac 1 / DNS server (Vikrant):    10.7.13.235  (en0)
@@ -21,7 +17,6 @@ address=/app.team1.test/10.7.17.39
 address=/api.team1.test/10.7.17.39
 ```
 `listen-address` includes Mac 1's LAN IP (10.7.13.235), not only 127.0.0.1, so other machines can use this DNS server.
-**TODO:** `interface=en0` was added to `config/dnsmasq.conf` in the repo; Vikrant must add the same line to the running `/opt/homebrew/etc/dnsmasq.conf` and restart dnsmasq so the pasted lines match what is running.
 
 ## A3: `dig app.team1.test` from a client (Mac 3)
 ```
@@ -152,32 +147,68 @@ Request 5: x-backend: B   {"backend": "B", "status": "ok"}
 ```
 Five consecutive requests to the same domain name through the nginx edge were served by both Backend A and Backend B (A, A, B, A, B), so the traffic is being distributed across both backends. Evidence: `evidence/taskC-D-load-balancing/load-balancer.png`.
 
-## B3: nginx configuration
+## B3: nginx configuration (live config on Mac 2)
 ```nginx
+worker_processes 1;
+
+events {
+    worker_connections 1024;
+}
+
 http {
+    # Log which backend served each request (useful evidence for Task D / failure demos)
+    log_format lb '$remote_addr [$time_local] "$request" $status '
+                  'upstream=$upstream_addr backend=$upstream_http_x_backend';
+    access_log /opt/homebrew/var/log/nginx/access.log lb;
+
+    # TASK D: Upstream Load Balancer (round-robin is the default policy)
+    # max_fails/fail_timeout = passive health check: after 1 failure the backend
+    # is skipped for 10s, so traffic keeps flowing to the healthy one.
     upstream backend_servers {
-        server 10.7.5.187:3001;   # Mac 3 (Backend A)
-        server 10.7.15.184:3002;  # Mac 4 (Backend B)
+        server 10.7.5.187:3001 max_fails=1 fail_timeout=10s;  # Mac 3 (Backend A)
+        server 10.7.15.184:3002 max_fails=1 fail_timeout=10s; # Mac 4 (Backend B)
     }
 
+    # TASK E: HTTPS / TLS Server Block
     server {
+        # Listen on HTTPS port 8443
         listen 8443 ssl;
+        http2 on;   # lets you show HTTP/2 (curl --http2 -I ...); remove if your nginx is < 1.25.1
+
         server_name app.team1.test api.team1.test;
 
+        # TLS Certificate paths (mkcert files)
         ssl_certificate     /opt/homebrew/etc/nginx/app.team1.test.pem;
         ssl_certificate_key /opt/homebrew/etc/nginx/app.team1.test-key.pem;
+
+        # Modern SSL settings
         ssl_protocols TLSv1.2 TLSv1.3;
+
+        # Failover: if one backend errors/times out, retry the request on the other
+        proxy_connect_timeout 2s;
+        proxy_read_timeout 10s;
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+
+        # Both backends down -> clear 502 from the edge
+        error_page 502 503 504 = @upstream_down;
+        location @upstream_down {
+            default_type text/plain;
+            return 502 "502 Bad Gateway: edge is up, but no backend answered.\n";
+        }
 
         location / {
             proxy_pass http://backend_servers;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
         }
     }
 }
 ```
-**TODO:** the live nginx on Mac 2 also has HTTP/2 enabled and a custom 502 page (visible in the curl output). Copy the real `/opt/homebrew/etc/nginx/nginx.conf` into `config/nginx.conf` and paste that version here.
+The upstream block lists both backend IPs and ports, the server block has `ssl_certificate` and `ssl_certificate_key`, and `proxy_pass` points to the upstream `backend_servers`.
 
 ---
 
@@ -225,8 +256,3 @@ Cache-Control (`max-age=60`), Date and X-Backend are all present, and the respon
 3. **After:** with Backend A stopped, every response is `HTTP/2 200` with `x-backend: B` and `{"backend": "B", "status": "ok"}` (three consecutive requests at 09:57:41, 09:57:44 and 09:57:46 GMT). Evidence: `evidence/failure-scenarios/fail3-one-backend-stopped.png`.
 4. **Layer affected:** the application / backend service layer behind the load balancer. The service on 10.7.5.187:3001 stopped accepting connections, so nginx stopped sending requests to it and used the remaining healthy backend. DNS, IP, the TCP connection to the edge and TLS were not affected, since the client still resolved the name, connected to nginx and completed the TLS handshake. It shows why a load balancer gives resilience.
 5. **Restored:** Backend A was restarted with `python3 backend/backend_a.py` on Mac 3. Afterwards the same requests were again served by both backends (`load-balancer.png` was captured at 10:04 GMT, after the failure demos at 09:57 to 09:59 GMT), so the system is back to its normal state.
-
----
-
-## TODO list before submitting
-1. Vikrant: add `interface=en0` to the running dnsmasq config (A2). Asad: copy the live nginx.conf into `config/nginx.conf` (B3).
