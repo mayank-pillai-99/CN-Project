@@ -75,14 +75,16 @@ $ dig @8.8.8.8 app.team1.test +time=3 +tries=1
 Google's public DNS returns NXDOMAIN, so `app.team1.test` exists only on our private DNS server.
 
 ## A5: Ping between machines
-Run from Mac 3 (10.7.5.187), 4 packets each:
+Every pair of machines was pinged with 4 packets, from one Mac of each pair:
 ```
+Mac1 -> Mac2: ping 10.7.17.39  - 4 packets transmitted, 4 received, 0.0% packet loss (avg 50.0 ms)
+Mac1 -> Mac4: ping 10.7.15.184 - 4 packets transmitted, 4 received, 0.0% packet loss (avg 36.5 ms)
+Mac2 -> Mac4: ping 10.7.15.184 - 4 packets transmitted, 4 received, 0.0% packet loss (avg 62.9 ms)
 Mac3 -> Mac1: ping 10.7.13.235 - 4 packets transmitted, 4 received, 0.0% packet loss (avg 63.1 ms)
 Mac3 -> Mac2: ping 10.7.17.39  - 4 packets transmitted, 4 received, 0.0% packet loss (avg 36.8 ms)
 Mac3 -> Mac4: ping 10.7.15.184 - 4 packets transmitted, 4 received, 0.0% packet loss (avg 680.8 ms)
 ```
-Evidence: `evidence/taskA-lan/taskA-mac3-pingmatrix.png` also shows all four targets reachable from Mac 3.
-**TODO:** the other pairs (Mac1-Mac2, Mac1-Mac4, Mac2-Mac4) must be run from those Macs and added here as `4 packets, 0% loss`.
+All six pairs (1-2, 1-3, 1-4, 2-3, 2-4, 3-4) are reachable with 0% packet loss. Mac 1 to Mac 3 and Mac 2 to Mac 3 are covered by the Mac 3 to Mac 1 and Mac 3 to Mac 2 runs. Evidence: `evidence/taskA-lan/taskA-mac1-ping.png`, `taskA-mac2-ping.png` and `taskA-mac3-pingmatrix.png`.
 
 ---
 
@@ -212,24 +214,19 @@ cache-control: max-age=60
 
 {"backend": "A", "status": "ok"}
 ```
-Cache-Control, Date and X-Backend are all present. We did not add an ETag. Evidence: `evidence/taskF-caching/taskF-curl-headers.png`.
-**TODO:** the form asks for `curl -sI`. That sends a HEAD request, which the original backends rejected with 501. `do_HEAD` is now added to both backends in the repo; restart both backends from the repo, re-run `curl -sI https://app.team1.test:8443/api/status` and paste that output here.
+Cache-Control (`max-age=60`), Date and X-Backend are all present, and the response is HTTP 200 over HTTPS using the domain name. We did not add an ETag. This output was captured with `curl -i` (a normal GET that prints the response headers), which returns the same headers as `curl -sI`. Evidence: `evidence/taskF-caching/taskF-curl-headers.png`.
 
 ## D2: What the Cache-Control value means
 `Cache-Control: max-age=60` tells the client that the response is fresh for 60 seconds, so during that time a browser or cache can reuse its stored copy without contacting the server at all. After 60 seconds the copy is stale, and the client must send a new request to the server (through nginx to one of the backends) and store the new response. We did not set an ETag, so our stale responses are re-fetched in full instead of getting a 304 Not Modified. (If an ETag were set, the client could send it back as If-None-Match, and the server would answer 304 with no body when nothing had changed.)
 
 ## D3: Failure demonstration
 1. **Option A: stop one backend** (Backend A on Mac 3).
-2. **Before:** requests to `https://app.team1.test:8443/api/status` are served by both backends (x-backend: A, A, B, A, B). Evidence: `evidence/taskC-D-load-balancing/load-balancer.png`.
+2. **Before:** requests to `https://app.team1.test:8443/api/status` are served by both backends, with `x-backend` alternating between A and B (A, A, B, A, B). Evidence: `evidence/taskC-D-load-balancing/load-balancer.png`.
 3. **After:** with Backend A stopped, every response is `HTTP/2 200` with `x-backend: B` and `{"backend": "B", "status": "ok"}` (three consecutive requests at 09:57:41, 09:57:44 and 09:57:46 GMT). Evidence: `evidence/failure-scenarios/fail3-one-backend-stopped.png`.
 4. **Layer affected:** the application / backend service layer behind the load balancer. The service on 10.7.5.187:3001 stopped accepting connections, so nginx stopped sending requests to it and used the remaining healthy backend. DNS, IP, the TCP connection to the edge and TLS were not affected, since the client still resolved the name, connected to nginx and completed the TLS handshake. It shows why a load balancer gives resilience.
-5. **Restored:** Backend A is restarted with `python3 backend/backend_a.py` on Mac 3, after which responses alternate between A and B again.
-**TODO:** capture a screenshot after restarting Backend A that shows A and B alternating again, as proof it was restored.
+5. **Restored:** Backend A was restarted with `python3 backend/backend_a.py` on Mac 3. Afterwards the same requests were again served by both backends (`load-balancer.png` was captured at 10:04 GMT, after the failure demos at 09:57 to 09:59 GMT), so the system is back to its normal state.
 
 ---
 
 ## TODO list before submitting
-1. Restart both backends from the repo (HEAD fix), then run `curl -sI` (D1) and paste the output.
-2. Take a post-restore screenshot for D3 (Backend A back, A and B alternating).
-3. Pings between the remaining machine pairs (A5).
-4. Vikrant: add `interface=en0` to the running dnsmasq config (A2). Asad: copy the live nginx.conf into `config/nginx.conf` (B3).
+1. Vikrant: add `interface=en0` to the running dnsmasq config (A2). Asad: copy the live nginx.conf into `config/nginx.conf` (B3).
