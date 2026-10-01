@@ -20,6 +20,9 @@ class BackendAHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"<h1>Hello from Backend A!</h1><p>Service is running.</p>")
 
+    # curl -I (the doc's header check) sends HEAD, so answer it like GET
+    do_HEAD = do_GET
+
 if __name__ == '__main__':
     # Listen on all interfaces (0.0.0.0) so other Macs can reach it, on port 3001
     server_address = ('0.0.0.0', 3001)
