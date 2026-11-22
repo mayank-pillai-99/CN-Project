@@ -42,3 +42,35 @@ All four addresses fall in 10.7.0.0 to 10.7.31.255, so they share one subnet.
 | 5 | nginx picks Backend A or B (round-robin) and forwards the request | Application | HTTP to 3001 / 3002 |
 | 6 | The backend replies with X-Backend; nginx relays it to the client | Application | HTTP |
 | all | Packets are routed by IP and carried over Wi-Fi | Network / Link | IPv4, Ethernet/Wi-Fi |
+
+## Phase 2 additions
+```
+                    Private Wi-Fi/LAN  10.7.0.0/19
+ +---------------------+                       +------------------------+
+ | Mac 1  Vikrant      |  same records, TTL 30 | Mac 3  Mayank          |
+ | PRIMARY DNS :53     |<--------------------->| BACKUP DNS :53         |
+ | + test client 2     |                       | Backend A :3001  [pf]  |
+ +---------------------+                       | STANDBY edge :8443     |
+            ^  clients list both DNS servers   +-----------^------------+
+            |  (primary first, backup second)              | DNS cutover
+            |                                              | (Ext E)
+ +----------+----------+   HTTPS :8443        +------------+-----------+
+ | Mac 4  Prashant     |--------------------->| Mac 2  Asad            |
+ | MAIN test client    |                      | PRIMARY edge nginx     |
+ | Backend B :3002 [pf]|<--- only Mac 2 may --| (passive health checks)|
+ +---------------------+     reach :3001/:3002+------------------------+
+```
+
+| Extension | What was added | Where |
+|---|---|---|
+| A Backup DNS | dnsmasq on Mac 3 with the same records; clients list Mac 1 then Mac 3 | Mac 1, Mac 3, clients |
+| B TTL | Records served with TTL 30 s (`host-record=...,30`) instead of 0 | Mac 1, Mac 3 |
+| C Service isolation | pf rules: only 10.7.26.179 (Asad) may connect to ports 3001 and 3002 | Mac 3, Mac 4 |
+| D HA failover | nginx `max_fails=1 fail_timeout=10s` + `proxy_next_upstream` (already in Phase 1 config) | Mac 2 |
+| E Edge migration | Standby nginx on Mac 3 with the same config and certificate; DNS record moved to 10.7.18.13 (Mayank) | Mac 3, DNS |
+
+**Remaining single points of failure.** The edge on Mac 2 is the main one: if it stops, no client
+can reach the service until DNS is moved (Extension E), and clients keep the old answer for up to
+one TTL. Removing it needs two edges that share a floating IP (keepalived/VRRP), or health-checked
+DNS failover like Route 53, or a managed redundant load balancer (AWS ALB). The Wi-Fi network and
+router are also single points of failure.
