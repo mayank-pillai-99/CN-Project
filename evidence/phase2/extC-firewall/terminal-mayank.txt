@@ -1,0 +1,7 @@
+
+===== 2026-11-22 21:37:58 | Mayanks-MacBook-Pro-2 (10.7.18.13) | test-backends from Mayank (should be BLOCKED) =====
+
+== Trying to reach the backends DIRECTLY from this Mac (not via nginx) ==
+
+    Backend B (Prashant)  10.7.26.134:3002
+ERR BLOCKED: no TCP connection to 10.7.26.134:3002 (timed out / refused)

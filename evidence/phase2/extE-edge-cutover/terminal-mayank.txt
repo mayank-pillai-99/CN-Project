@@ -1,0 +1,6 @@
+
+===== 2026-11-22 22:00:44 | Mayanks-MacBook-Pro-2 (10.7.18.13) | which-edge =====
+
+== Which edge answered? (22:00:44) ==
+    This Mac resolves app.team1.test -> 10.7.18.13  (Mayank's Mac 3, the standby edge)
+        HTTP 200   X-Backend: B   X-Edge: standby-mac3
