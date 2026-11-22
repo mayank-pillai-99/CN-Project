@@ -1,5 +1,6 @@
 #!/bin/bash
-# Mayank - Mac 3 - Backend A + backup DNS + standby edge
+# Mayank - Mac 3 - Backend A + test client (same as Phase 1)
+#          Phase 2 additions: backup DNS + standby edge
 # Usage: bash mayank.sh <command>      (bash mayank.sh help  lists commands)
 
 . "$(cd "$(dirname "$0")" && pwd)/common.sh"
@@ -8,18 +9,24 @@ CMD="${1:-help}"; shift 2>/dev/null
 
 usage() {
     cat <<EOF
-${B}Mayank - Mac 3 ($MAC3_IP): Backend A + backup DNS + standby edge${N}
+${B}Mayank - Mac 3 ($MAC3_IP): Backend A + test client${N}
+${B}         Phase 2 additions: backup DNS + standby edge${N}
 
  Step 0  ${B}check-team${N}       Check your IP and that all 4 Macs answer
  Step 1  ${B}backup-dns${N}       Install and start the BACKUP DNS server on this Mac
+         ${B}set-dns${N}          Make this Mac use Mac 1 + Mac 3 (backup) as DNS
  Step 3  ${B}point-to <mac>${N}   Point $DOMAIN_APP at mac2 (normal), mac3 or mac4;  Vikrant does the same
  Step 4  ${B}firewall-on${N}      Only Asad's edge may reach Backend A (port $PORT_A)
+         ${B}test-backends${N}    Try to reach Prashant's backend directly (should be BLOCKED)
          ${B}firewall-off${N}     Remove that rule again (rollback)
  Step 5  ${B}backend-a${N}        Start Backend A (Ctrl+C stops it)
  Step 6  ${B}standby-edge${N}     Set up nginx here as a copy of Asad's edge
+         ${B}flush${N}            Empty this Mac's DNS cache
+         ${B}which-edge${N}       Show which edge (Asad or Mayank) answers
          ${B}standby-stop${N}     Stop the standby nginx
  Step 7  ${B}status${N}           Check everything is back to normal
- Other   ${B}dns-stop${N}  ${B}dns-start${N}  ${B}undo-backup-dns${N}
+ Other   ${B}dns-test${N}  ${B}site${N}  ${B}check-cache${N}  ${B}loop${N}  ${B}unset-dns${N}
+         ${B}dns-stop${N}  ${B}dns-start${N}  ${B}undo-backup-dns${N}
 EOF
 }
 
@@ -48,6 +55,22 @@ case "$CMD" in
         ;;
     firewall-on)   firewall_on "$PORT_A" "Backend A" ;;
     firewall-off)  firewall_off "$PORT_A" ;;
+    # --- test client commands (Mac 3 was a client in Phase 1 too) ---
+    set-dns)      set_dns ;;
+    unset-dns)    unset_dns ;;
+    flush)        flush_dns ;;
+    dns-test)     logrun extA-backup-dns "dns-test" dns_test ;;
+    site)         logrun extA-backup-dns "site" site ;;
+    check-cache)  logrun extB-ttl "check-cache" check_cache ;;
+    loop)         logrun extD-failover "loop" loop ;;
+    test-backends)
+        logrun extC-firewall "test-backends from Mayank (should be BLOCKED)" test_backends
+        shot "Prashant's backend BLOCKED from Mayank's Mac (Extension C)"
+        ;;
+    which-edge)
+        logrun extE-edge-cutover "which-edge" which_edge
+        shot "which edge answered and the time (Extension E)"
+        ;;
     backend-a)
         cd "$REPO_ROOT" && exec python3 backend/backend_a.py
         ;;
@@ -91,6 +114,8 @@ case "$CMD" in
         status_proc dnsmasq "Backup DNS server"
         status_dns_record "$MAC3_IP"
         status_pf "$PORT_A"
+        status_client_dns
+        status_site
         if pgrep -x nginx >/dev/null; then st_line 1 "Standby nginx is still running (stop it after Step 6)"; else st_line 0 "Standby nginx is stopped (normal)"; fi
         shot "this status list (Step 7)"
         ;;

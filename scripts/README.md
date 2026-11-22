@@ -2,12 +2,15 @@
 
 Each person has one script and runs it only on their own Mac.
 
-| Person | Mac | Script |
-|---|---|---|
-| Vikrant | Mac 1 | `vikrant.sh` |
-| Asad | Mac 2 | `asad.sh` |
-| Mayank | Mac 3 | `mayank.sh` |
-| Prashant | Mac 4 | `prashant.sh` |
+The Phase 1 roles stay the same. Phase 2 only adds jobs, and the PDF requires both added jobs
+to be on a Mac other than Mac 1 and Mac 2.
+
+| Person | Mac | Role (same as Phase 1) | Added in Phase 2 | Script |
+|---|---|---|---|---|
+| Vikrant | Mac 1 | DNS server | 30 s TTL on records | `vikrant.sh` |
+| Asad | Mac 2 | nginx edge (TLS + load balancer) | `X-Edge` header, failover demo | `asad.sh` |
+| Mayank | Mac 3 | Backend A + test client | Backup DNS, standby edge, firewall on 3001 | `mayank.sh` |
+| Prashant | Mac 4 | Backend B + test client (main) | Firewall on 3002 | `prashant.sh` |
 
 ## Before you start (every time)
 
@@ -33,7 +36,7 @@ evaluation day.
    into nginx.conf.
 5. **Vikrant** runs `bash vikrant.sh dns-ttl` and **Mayank** runs `bash mayank.sh backup-dns`.
    This makes `app.team1.test` point to Asad's new IP.
-6. **Prashant** and **Vikrant** run `bash <name>.sh set-dns` to use the new DNS server IPs.
+6. **Prashant** and **Mayank** (the test clients) run `bash <name>.sh set-dns` to use the new DNS server IPs.
 
 The scripts take every IP from `team.env`. Nothing else needs editing; for example, Step 3 uses
 `point-to mac4`, not an IP. Your mkcert certificate is tied to the name `app.team1.test`, not an
@@ -43,7 +46,7 @@ IP, so it keeps working.
 
 Do each step together, on the same Wi-Fi. Lines marked `>>> SCREENSHOT` in the script output
 tell you when to take a screenshot. Save screenshots in `evidence/phase2/<extension folder>/`.
-Prashant's and Vikrant's test commands also save their output to text files in those folders.
+Prashant's and Mayank's test commands also save their output to text files in those folders.
 
 ### Step 1: Second DNS server (Extension A)
 | Who | Command |
@@ -51,7 +54,7 @@ Prashant's and Vikrant's test commands also save their output to text files in t
 | Vikrant | `bash vikrant.sh dns-ttl` |
 | Mayank | `bash mayank.sh backup-dns` |
 | Prashant | `bash prashant.sh set-dns`, then `bash prashant.sh dns-test` 📸 |
-| Vikrant | `bash vikrant.sh set-dns` 📸 |
+| Mayank | `bash mayank.sh set-dns` 📸 |
 
 ### Step 2: Main DNS goes down, website still works (Extension A)
 | Who | Command |
@@ -83,7 +86,8 @@ Do the same in Step 6.
 |---|---|
 | Mayank **and** Prashant | `bash <name>.sh firewall-on` 📸 |
 | Asad | `bash asad.sh test-backends` 📸: ALLOWED |
-| Vikrant | `bash vikrant.sh test-backends` 📸: BLOCKED |
+| Mayank | `bash mayank.sh test-backends` 📸: Prashant's backend BLOCKED |
+| Prashant | `bash prashant.sh test-backends` 📸: Mayank's backend BLOCKED |
 | Prashant | `bash prashant.sh site` 📸: website still works through nginx |
 | Mayank **and** Prashant | `bash <name>.sh firewall-off` 📸 (rollback) |
 
@@ -109,7 +113,7 @@ Do Step 4's `firewall-off` first.
 | Prashant | `bash prashant.sh which-edge` 📸: Asad's edge |
 | Vikrant **and** Mayank | `bash <name>.sh point-to mac3` |
 | Prashant | `bash prashant.sh which-edge` 📸: still Asad's (cached) |
-| Vikrant | `bash vikrant.sh flush`, `bash vikrant.sh which-edge` 📸: Mayank's |
+| Mayank | `bash mayank.sh flush`, `bash mayank.sh which-edge` 📸: Mayank's (fresh lookup) |
 | Prashant | wait 30 s, `bash prashant.sh which-edge` 📸: Mayank's |
 | Asad | `bash asad.sh edge-stop` |
 | Prashant | `bash prashant.sh which-edge` 📸: still works |

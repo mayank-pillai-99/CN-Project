@@ -17,6 +17,7 @@ ${B}Prashant - Mac 4 ($MAC4_IP): Backend B + main test client${N}
  Step 3  ${B}check-cache${N}      Cached DNS answer vs fresh DNS answer
          ${B}flush${N}            Empty this Mac's DNS cache
  Step 4  ${B}firewall-on${N}      Only Asad's edge may reach Backend B (port $PORT_B)
+         ${B}test-backends${N}    Try to reach Mayank's backend directly (should be BLOCKED)
          ${B}firewall-off${N}     Remove that rule again (rollback)
  Step 5  ${B}loop${N}             Send 6 requests, show which backend answered each
          ${B}backend-b${N}        Start Backend B (Ctrl+C stops it)
@@ -50,6 +51,10 @@ case "$CMD" in
     flush)  flush_dns ;;
     firewall-on)   firewall_on "$PORT_B" "Backend B" ;;
     firewall-off)  firewall_off "$PORT_B" ;;
+    test-backends)
+        logrun extC-firewall "test-backends from Prashant (should be BLOCKED)" test_backends
+        shot "Mayank's backend BLOCKED from Prashant's Mac (Extension C)"
+        ;;
     loop)
         logrun extD-failover "loop" loop
         shot "which backend answered each request (Extension D)"

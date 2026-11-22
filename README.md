@@ -24,12 +24,14 @@ python3 backend/backend_b.py     # Mac 4, port 3002
 ## Phase 2: Harden & Recover
 Phase 2 adds to the same setup. Phase 1 files are unchanged.
 
-| Mac | Phase 2 additions |
-|---|---|
-| Mac 1 (Vikrant) | DNS records now have a 30 s TTL; also test client 2 |
-| Mac 2 (Asad) | `X-Edge: primary-mac2` header; backend failover demo |
-| Mac 3 (Mayank) | Backup DNS server, firewall on port 3001, standby nginx edge |
-| Mac 4 (Prashant) | Firewall on port 3002; main test client |
+Roles are the same as Phase 1. Phase 2 only adds jobs:
+
+| Mac | Phase 1 role (unchanged) | Phase 2 additions |
+|---|---|---|
+| Mac 1 (Vikrant) | DNS server | Records now have a 30 s TTL |
+| Mac 2 (Asad) | nginx edge | `X-Edge: primary-mac2` header; backend failover demo |
+| Mac 3 (Mayank) | Backend A + test client | Backup DNS server, firewall on port 3001, standby nginx edge |
+| Mac 4 (Prashant) | Backend B + test client | Firewall on port 3002 |
 
 - `scripts/`: one script per person. **Start with [scripts/README.md](scripts/README.md)** for the step-by-step run order.
 - `config/phase2/`: Phase 2 configs (backup DNS, TTL, pf firewall rules, primary and standby nginx)

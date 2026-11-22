@@ -44,21 +44,24 @@ All four addresses fall in 10.7.0.0 to 10.7.31.255, so they share one subnet.
 | all | Packets are routed by IP and carried over Wi-Fi | Network / Link | IPv4, Ethernet/Wi-Fi |
 
 ## Phase 2 additions
+The Phase 1 roles above do not change. Phase 2 adds a backup DNS and a standby edge on Mac 3,
+and firewall rules on both backends.
 ```
                     Private Wi-Fi/LAN  10.7.0.0/19
  +---------------------+                       +------------------------+
  | Mac 1  Vikrant      |  same records, TTL 30 | Mac 3  Mayank          |
- | PRIMARY DNS :53     |<--------------------->| BACKUP DNS :53         |
- | + test client 2     |                       | Backend A :3001  [pf]  |
- +---------------------+                       | STANDBY edge :8443     |
-            ^  clients list both DNS servers   +-----------^------------+
+ | PRIMARY DNS :53     |<--------------------->| Backend A :3001 [pf]   |
+ | (DNS only, as P1)   |                       | + test client          |
+ +---------------------+                       | + BACKUP DNS :53       |
+            ^                                  | + STANDBY edge :8443   |
+            |  clients list both DNS servers   +-----------^------------+
             |  (primary first, backup second)              | DNS cutover
             |                                              | (Ext E)
  +----------+----------+   HTTPS :8443        +------------+-----------+
  | Mac 4  Prashant     |--------------------->| Mac 2  Asad            |
- | MAIN test client    |                      | PRIMARY edge nginx     |
- | Backend B :3002 [pf]|<--- only Mac 2 may --| (passive health checks)|
- +---------------------+     reach :3001/:3002+------------------------+
+ | Backend B :3002 [pf]|                      | PRIMARY edge nginx     |
+ | + main test client  |<--- only Mac 2 may --| (passive health checks)|
+ +---------------------+   reach :3001/:3002  +------------------------+
 ```
 
 | Extension | What was added | Where |

@@ -331,6 +331,11 @@ test_backends() {
     local t ip port
     for t in "$MAC3_IP:$PORT_A:Backend A (Mayank)" "$MAC4_IP:$PORT_B:Backend B (Prashant)"; do
         ip="${t%%:*}"; port="$(echo "$t" | cut -d: -f2)"
+        # A Mac's own backend is not a fair test (traffic to yourself skips the
+        # firewall), so only test the other Mac's backend.
+        if [ "$ip" = "$(ipconfig getifaddr "$IFACE" 2>/dev/null)" ]; then
+            continue
+        fi
         echo; info "$(echo "$t" | cut -d: -f3-)  $ip:$port"
         if nc -z -G 3 "$ip" "$port" 2>/dev/null; then
             ok "ALLOWED: TCP connection to $ip:$port works"
