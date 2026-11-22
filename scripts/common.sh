@@ -176,7 +176,7 @@ wait_dns() {   # $1 DNS server IP
 # Ask one DNS server directly and print the answer line (name, TTL, IP).
 dns_answer() {   # $1 DNS server IP
     local out
-    out="$(dig @"$1" "$DOMAIN_APP" +nocmd +noall +answer +time=2 +tries=1 2>&1)"
+    out="$(dig @"$1" "$DOMAIN_APP" +nocmd +noall +answer +time=3 +tries=2 2>&1)"
     if echo "$out" | grep -q "IN.*A"; then
         ok "DNS server $1 answers:"; info "$out"
         info "(columns: name, TTL seconds, class, type, IP address)"
@@ -290,7 +290,7 @@ dns_test() {
 site() {
     title "Opening $URL_STATUS"
     local out rc code
-    out="$(curl -isS --max-time 5 "$URL_STATUS" 2>&1)"; rc=$?
+    out="$(curl -isS --max-time 15 "$URL_STATUS" 2>&1)"; rc=$?
     echo "$out" | tr -d '\r'
     echo
     code="$(echo "$out" | awk '/^HTTP/ {print $2; exit}')"
@@ -309,7 +309,7 @@ check_cache() {
     local ip; ip="$(system_lookup)"
     echo "      $DOMAIN_APP -> ${B}${ip:-no answer}${N}"
     info "2) Fresh answer straight from the DNS server (dig skips the cache):"
-    echo "      $DOMAIN_APP -> ${B}$(dig "$DOMAIN_APP" +short +time=2 +tries=1 | head -1)${N}"
+    echo "      $DOMAIN_APP -> ${B}$(dig "$DOMAIN_APP" +short +time=3 +tries=2 | head -1)${N}"
     echo
     info "If 1) and 2) differ, this Mac is still using its cached (old) answer."
     info "It switches after the $DNS_TTL second TTL runs out, or right away after 'flush'."
@@ -318,7 +318,7 @@ check_cache() {
 # One request, printed as one short line.
 one_request() {
     local h code be edge
-    h="$(curl -s -o /dev/null -D - --max-time 5 "$URL_STATUS" | tr -d '\r')"
+    h="$(curl -s -o /dev/null -D - --max-time 15 "$URL_STATUS" | tr -d '\r')"
     if [ -z "$h" ]; then echo "      ${R}no response (curl failed)${N}"; return; fi
     code="$(echo "$h" | awk 'NR==1 {print $2}')"
     be="$(echo "$h" | awk -F': ' 'tolower($1)=="x-backend" {print $2}')"
@@ -355,9 +355,9 @@ test_backends() {
             continue
         fi
         echo; info "$(echo "$t" | cut -d: -f3-)  $ip:$port"
-        if nc -z -G 3 "$ip" "$port" 2>/dev/null; then
+        if nc -z -G 6 "$ip" "$port" 2>/dev/null; then
             ok "ALLOWED: TCP connection to $ip:$port works"
-            curl -s --max-time 3 "http://$ip:$port/api/status" | sed 's/^/      /'; echo
+            curl -s --max-time 10 "http://$ip:$port/api/status" | sed 's/^/      /'; echo
         else
             bad "BLOCKED: no TCP connection to $ip:$port (timed out / refused)"
         fi
@@ -442,7 +442,7 @@ nginx_apply() {   # test config, then reload (or start if not running)
 edge_check() {   # $1 IP of this edge: ask it directly, bypassing DNS
     info "Asking this edge directly (curl --resolve, DNS not used):"
     local h
-    h="$(curl -s -o /dev/null -D - --max-time 5 --resolve "$DOMAIN_APP:$EDGE_PORT:$1" "$URL_STATUS" | tr -d '\r')"
+    h="$(curl -s -o /dev/null -D - --max-time 15 --resolve "$DOMAIN_APP:$EDGE_PORT:$1" "$URL_STATUS" | tr -d '\r')"
     if [ -n "$h" ]; then
         echo "$h" | grep -i -e '^HTTP' -e '^x-edge' -e '^x-backend' | sed 's/^/      /'
     else
@@ -464,7 +464,7 @@ status_listen() {   # $1 port, $2 label
     sudo lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; st_line $? "$2 listening on port $1"
 }
 status_dns_record() {   # $1 DNS server IP
-    local a; a="$(dig @"$1" "$DOMAIN_APP" +short +time=2 +tries=1 2>/dev/null | head -1)"
+    local a; a="$(dig @"$1" "$DOMAIN_APP" +short +time=3 +tries=2 2>/dev/null | head -1)"
     [ "$a" = "$MAC2_IP" ]; st_line $? "DNS on $1: $DOMAIN_APP -> ${a:-no answer} (normal: $MAC2_IP)"
 }
 status_pf() {   # $1 port
@@ -480,6 +480,6 @@ status_client_dns() {
     st_line $? "DNS servers on this Mac: $s"
 }
 status_site() {
-    local code; code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL_STATUS")"
+    local code; code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$URL_STATUS")"
     [ "$code" = 200 ]; st_line $? "$URL_STATUS -> HTTP $code"
 }
