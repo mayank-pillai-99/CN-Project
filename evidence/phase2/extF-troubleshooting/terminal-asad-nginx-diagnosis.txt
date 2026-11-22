@@ -1,0 +1,43 @@
+# Asad's terminal (Mac 2), 22 Nov 2026, during Phase 2 setup (Step 0).
+# Symptom on the client: curl exit 7 / timeout to app.team1.test:8443; ping to Mac 2 worked.
+# Output pasted by the team during the session.
+
+faizali1@Asads-MacBook-Pro-2 scripts % bash asad.sh status
+== Status of Asad's Mac 2 ==
+  [ok] IP address: 10.7.26.179 (team.env says 10.7.26.179)
+  [ok] nginx edge running (nginx)
+  [--] nginx listening on port 8443
+  [--] https://app.team1.test:8443/api/status -> HTTP 000
+
+faizali1@Asads-MacBook-Pro-2 scripts % sudo lsof -nP -iTCP -sTCP:LISTEN | grep nginx
+nginx     89543     root    6u  IPv4 0x3ec1ad0bd1eddebb      0t0  TCP *:80 (LISTEN)
+nginx     89543     root    7u  IPv4 0xf2078c539d93d772      0t0  TCP *:8080 (LISTEN)
+nginx     89544   nobody    6u  IPv4 0x3ec1ad0bd1eddebb      0t0  TCP *:80 (LISTEN)
+nginx     89544   nobody    7u  IPv4 0xf2078c539d93d772      0t0  TCP *:8080 (LISTEN)
+# -> nginx was running with Homebrew's default config (ports 80/8080), not the TLS edge config (8443)
+
+faizali1@Asads-MacBook-Pro-2 scripts % /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate
+Firewall is enabled. (State = 1)
+faizali1@Asads-MacBook-Pro-2 scripts % /usr/libexec/ApplicationFirewall/socketfilterfw --getblockall
+Firewall has block all state set to disabled.
+# (Mac 2 is a managed Mac: "Firewall settings cannot be modified from command line on managed Mac computers.")
+
+# Fix 1: copied the edge config (config/nginx.conf) into /opt/homebrew/etc/nginx/nginx.conf, restarted nginx.
+# Next symptom: HTTP 502 after ~4 s (see 01-prashant-502-stale-backend-ips-in-nginx.png).
+
+faizali1@Asads-MacBook-Pro-2 scripts % grep -n "server 10" /opt/homebrew/etc/nginx/nginx.conf
+17:        server 10.7.5.187:3001 max_fails=1 fail_timeout=10s;  # Mac 3 (Backend A)
+18:        server 10.7.15.184:3002 max_fails=1 fail_timeout=10s; # Mac 4 (Backend B)
+# -> the upstream still had the Phase 1 backend IPs; DHCP had given the backends new IPs.
+
+faizali1@Asads-MacBook-Pro-2 scripts % bash asad.sh update-backends
+== Step 0: point nginx at Backend A = 10.7.18.13, Backend B = 10.7.26.134 (from team.env) ==
+    Backend lines in nginx.conf now:
+      server 10.7.18.13:3001 max_fails=1 fail_timeout=10s;  # Mac 3 (Backend A)
+      server 10.7.26.134:3002 max_fails=1 fail_timeout=10s; # Mac 4 (Backend B)
+nginx: the configuration file /opt/homebrew/etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /opt/homebrew/etc/nginx/nginx.conf test is successful
+nginx: [emerg] bind() to 0.0.0.0:8443 failed (48: Address already in use)
+nginx: [emerg] still could not bind()
+# -> the script tried to start a second nginx instead of reloading the running one.
+# Fix 2: "sudo nginx -s reload". Afterwards the client loop showed HTTP 200, A/B alternating (21:00:39).

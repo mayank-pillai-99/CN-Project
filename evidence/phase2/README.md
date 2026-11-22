@@ -57,12 +57,5 @@ timestamped text logs written by the scripts.
 |---|---|
 | 01 | Real fault found during setup: HTTP 502 because nginx still pointed at the old backend IPs. Fixed by updating the upstream IPs and reloading nginx |
 | 02 | Real fault: DNS fine (both servers answer) but TCP to the edge timed out. Diagnosed layer by layer (DNS ok → ping ok → TCP 8443 failed) |
+| `terminal-asad-nginx-diagnosis.txt` | Asad's terminal during the 8443/502 diagnosis: nginx on the wrong ports, then old upstream IPs |
 | 03–05 | Final status after the session: everything back to normal. Asad's last line is `[--]` because Mac 2 is not a test client and does not use the team DNS |
-
-## Not captured as screenshots
-- **Ext A:** the client's `dns-test` while the primary DNS was stopped (primary ERR, backup OK). It is in
-  Prashant's `extA-backup-dns/terminal-prashant.txt` log. The "both backends down → HTTP 502" screenshot is
-  also missing (file 01 in Ext F shows a 502 from a different cause).
-- **Ext B:** the moment where the cached answer (old IP) and the fresh answer (new IP) differ.
-- **Ext E:** the client still on the old edge right after the DNS change (its cache expired before the check).
-- **Ext F:** screenshots of the practice fault rounds.

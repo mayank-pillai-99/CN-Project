@@ -15,7 +15,7 @@ from `scripts/team.env`. The Phase 1 files in `config/` are unchanged.
 What changed from Phase 1:
 - **dnsmasq:** `address=` (TTL 0) became `host-record=...,30` (TTL 30 s). `no-resolv` plus `server=`
   stops a forwarding loop now that clients list both team DNS servers. The `server=` value is this
-  Mac's original upstream DNS, detected by the script.
+  Mac's original upstream DNS, detected by the script (8.8.8.8 in our session).
 - **pf:** only the edge (10.7.17.39) may open TCP connections to the backend port; everyone else
   is dropped. Rollback: `sudo pfctl -f /etc/pf.conf`, which loads the untouched macOS default rules.
   The scripts also keep a copy in `~/.team1-phase2/pf.conf.original`.

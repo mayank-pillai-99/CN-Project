@@ -1,0 +1,32 @@
+# Prashant's terminal (Mac 4), 22 Nov 2026, Extension A step 2.
+# Vikrant had run "bash vikrant.sh dns-stop" (primary DNS on Mac 1 stopped).
+# Output pasted by the team during the session.
+
+prashantraj~$bash prashant.sh flush
+Password:
+OK  This Mac's DNS cache is empty; the next lookup asks the DNS server again.
+prashantraj~$bash prashant.sh dns-test
+
+===== 2026-11-22 21:10:26 | Prashants-MacBook-Pro (10.7.26.134) | dns-test =====
+
+== Asking each team DNS server directly (dig @server) ==
+ERR DNS server 10.7.29.164 did not answer for app.team1.test
+
+; <<>> DiG 9.10.6 <<>> @10.7.29.164 app.team1.test +nocmd +noall +answer +time=2 +tries=1
+; (1 server found)
+;; global options: +cmd
+;; connection timed out; no servers could be reached
+
+OK  DNS server 10.7.18.13 answers:
+
+; <<>> DiG 9.10.6 <<>> @10.7.18.13 app.team1.test +nocmd +noall +answer +time=2 +tries=1
+; (1 server found)
+;; global options: +cmd
+app.team1.test.         30      IN      A       10.7.26.179
+    (columns: name, TTL seconds, class, type, IP address)
+
+== What this Mac itself uses (system resolver, can fail over) ==
+OK  app.team1.test -> 10.7.26.179
+
+# At 21:15:41 (primary DNS still stopped) "bash prashant.sh site" returned HTTP/2 200
+# from Backend B: see screenshot 06-prashant-site-works-while-primary-dns-down.png
