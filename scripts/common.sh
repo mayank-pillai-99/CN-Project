@@ -160,7 +160,16 @@ write_dnsmasq() {   # $1 listen IP, $2 IP for app.team1.test, $3 description
     sudo cp "$tmp" "$DNSMASQ_CONF"; rm -f "$tmp"
     ok "Wrote $DNSMASQ_CONF  ($DOMAIN_APP -> $2, TTL $DNS_TTL s, other names -> $up)"
     sudo brew services restart dnsmasq >/dev/null 2>&1 || die "Could not (re)start dnsmasq"
-    sleep 2
+    wait_dns "$1"
+}
+
+# dnsmasq can take a few seconds to start (longer the first time): retry for ~10 s.
+wait_dns() {   # $1 DNS server IP
+    local i
+    for i in 1 2 3 4 5; do
+        dig @"$1" "$DOMAIN_APP" +short +time=1 +tries=1 2>/dev/null | grep -q . && break
+        sleep 2
+    done
     dns_answer "$1"
 }
 
@@ -179,7 +188,7 @@ dns_answer() {   # $1 DNS server IP
 
 dns_stop()  { title "Stopping dnsmasq"; sudo brew services stop dnsmasq >/dev/null 2>&1; sleep 1
               pgrep -x dnsmasq >/dev/null && bad "dnsmasq is still running" || ok "dnsmasq is stopped (this DNS server no longer answers)"; }
-dns_start() { title "Starting dnsmasq"; sudo brew services start dnsmasq >/dev/null 2>&1; sleep 2; dns_answer "$1"; }
+dns_start() { title "Starting dnsmasq"; sudo brew services start dnsmasq >/dev/null 2>&1; wait_dns "$1"; }
 
 # mac1..mac4 -> IP from team.env (an IP is passed through unchanged)
 mac_ip() {
@@ -280,9 +289,18 @@ dns_test() {
 
 site() {
     title "Opening $URL_STATUS"
-    curl -i --max-time 5 "$URL_STATUS"; local rc=$?
+    local out rc code
+    out="$(curl -isS --max-time 5 "$URL_STATUS" 2>&1)"; rc=$?
+    echo "$out" | tr -d '\r'
     echo
-    [ $rc -eq 0 ] && ok "Website answered" || bad "curl failed (exit code $rc)"
+    code="$(echo "$out" | awk '/^HTTP/ {print $2; exit}')"
+    if [ $rc -ne 0 ]; then
+        bad "curl failed (exit code $rc): no HTTPS connection to the edge"
+    elif [ "$code" = 200 ]; then
+        ok "Website works: HTTP 200"
+    else
+        bad "Edge answered, but with HTTP $code (502 = nginx could not reach any backend)"
+    fi
 }
 
 check_cache() {
@@ -411,8 +429,10 @@ set_edge_header() {   # $1 value, e.g. primary-mac2
 
 nginx_apply() {   # test config, then reload (or start if not running)
     sudo "$(nginx_bin)" -t || die "nginx config test failed; nothing was reloaded"
-    if pgrep -x nginx >/dev/null; then
-        sudo "$(nginx_bin)" -s reload && ok "nginx reloaded"
+    # Reload the running nginx; only start a new one if none is running
+    # (reload fails when there is no running nginx to signal).
+    if sudo "$(nginx_bin)" -s reload 2>/dev/null; then
+        ok "nginx reloaded"
     else
         sudo "$(nginx_bin)" && ok "nginx started"
     fi
@@ -441,7 +461,7 @@ status_proc() {   # $1 process name, $2 label
     pgrep -x "$1" >/dev/null; st_line $? "$2 running ($1)"
 }
 status_listen() {   # $1 port, $2 label
-    lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; st_line $? "$2 listening on port $1"
+    sudo lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; st_line $? "$2 listening on port $1"
 }
 status_dns_record() {   # $1 DNS server IP
     local a; a="$(dig @"$1" "$DOMAIN_APP" +short +time=2 +tries=1 2>/dev/null | head -1)"
