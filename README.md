@@ -49,7 +49,7 @@ The backends are reached by clients through the nginx edge (Mac 2) at `https://a
 - `config/`: `dnsmasq.conf` (Mac 1) and `nginx.conf` (Mac 2)
 - `docs/ARCHITECTURE.md`: topology, roles and IP table, request flow
 - `evidence/`: screenshots and captures, one folder per task
-- `report/`: Phase 1 report (`report.pdf`) and demo video script
+- `report/`: Phase 1 report (`report.pdf`)
 
 ## Phase 2: Harden & Recover
 Phase 2 adds to the same setup. Phase 1 files are unchanged.
@@ -66,4 +66,4 @@ Roles are the same as Phase 1. Phase 2 only adds jobs:
 - `scripts/`: one script per person. **Start with [scripts/README.md](scripts/README.md)** for the step-by-step run order.
 - `config/phase2/`: Phase 2 configs (backup DNS, TTL, pf firewall rules, primary and standby nginx)
 - `evidence/phase2/`: screenshots and logs, one folder per extension (A–F)
-- `report/phase2/`: Phase 2 report
+- `report/phase2/`: Phase 2 report (`report.pdf`)
